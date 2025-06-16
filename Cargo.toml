@@ -1,0 +1,31 @@
+[package]
+name = "seria"
+description = "A lightweight Revolt client library built for the Rust ecosystem."
+version = "0.0.1-dev"
+authors = ["Reina <notmarx.tech@gmail.com>"]
+repository = "https://github.com/reinacchi/seria"
+license = "MIT"
+edition = "2021"
+
+[features]
+default = ["cache", "type-store"]
+cache = []
+type-store = []
+rmp-serde = ["dep:rmp-serde"]
+msgpack = ["rmp-serde"]
+
+[dependencies]
+async-channel = "2.3.1"
+bitflags = { version = "2.9.1", features = ["serde"] }
+futures = "0.3.31"
+reqwest = { version = "0.12.20", default-features = false, features = ["json", "rustls-tls"] }
+rmp-serde = { version = "1.3.0", optional = true }
+serde = { version = "1.0.219", features = ["derive"] }
+serde_json = "1.0.140"
+thiserror = "2.0.12"
+tokio = { version = "1.45.1", features = ["rt-multi-thread", "sync", "time"] }
+tokio-tungstenite = { version = "0.26.2", features = ["rustls-tls-webpki-roots"] }
+tracing = "0.1.41"
+
+[dev-dependencies]
+tokio = { version = "1.45.1", features = ["macros"] }
