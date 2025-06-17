@@ -1,5 +1,5 @@
 use async_channel::{self, Receiver, Sender};
-use futures::{SinkExt, Stream, StreamExt};
+use futures::{pin_mut, SinkExt, Stream, StreamExt};
 use std::time::{Duration, Instant};
 use tokio::{select, spawn, time::sleep};
 use tokio_tungstenite::{connect_async, tungstenite::Message};
@@ -13,7 +13,6 @@ use crate::{
 #[derive(Debug, Clone)]
 pub struct GatewayClient {
     config: GatewayConfig,
-    heartbeat_interval: Duration,
     last_heartbeat: (Instant, Instant),
     client_sender: Sender<ClientEvent>,
     client_receiver: Receiver<ClientEvent>,
@@ -28,7 +27,6 @@ impl GatewayClient {
 
         Self {
             config,
-            heartbeat_interval: Duration::from_secs(30),
             last_heartbeat: (Instant::now(), Instant::now()),
             client_receiver,
             client_sender,
@@ -38,17 +36,37 @@ impl GatewayClient {
     }
 
     pub async fn connect(&mut self) -> Result<(), SeriaError> {
+        loop {
+            match self.try_connect().await {
+                Ok(_) => {
+                    self.config.reconnect_attempts = 0; // Reset attempts on successful connection
+                    return Ok(());
+                }
+                Err(e) => {
+                    if self.config.reconnect_attempts >= self.config.max_reconnect_attempts {
+                        return Err(e);
+                    }
+
+                    self.config.reconnect_attempts += 1;
+                    let delay = self.config.reconnect_delay * self.config.reconnect_attempts as u32;
+                    sleep(delay).await;
+                }
+            }
+        }
+    }
+
+    async fn try_connect(&mut self) -> Result<(), SeriaError> {
         let (mut stream, _) = connect_async(&self.config.ws_url).await?;
         let client_receiver = self.client_receiver.clone();
         let server_sender = self.server_sender.clone();
+        let heartbeat_sender = self.client_sender.clone();
 
-        spawn(Self::heartbeat(
-            self.client_sender.clone(),
-            self.heartbeat_interval,
+        let heartbeat_task = spawn(Self::heartbeat(
+            heartbeat_sender,
+            self.config.heartbeat_interval,
         ));
 
-        spawn(async move {
-            use futures::pin_mut;
+        let connection_task = spawn(async move {
             pin_mut!(client_receiver);
 
             loop {
@@ -78,6 +96,11 @@ impl GatewayClient {
                                         }
                                     };
 
+                                    // Handle heartbeat acknowledgment
+                                    if let Ok(GatewayEvent::Pong) = serde_json::from_value(value.clone()) {
+                                        continue;
+                                    }
+
                                     match serde_json::from_value(value.clone()) {
                                         Ok(event) => Ok(event),
                                         Err(_) => continue,
@@ -97,13 +120,28 @@ impl GatewayClient {
                     else => break,
                 }
             }
+
+            let _ = server_sender
+                .send(Err(SeriaError::Other(
+                    "WebSocket disconnected.".to_string(),
+                )))
+                .await;
         });
 
         self.send(ClientEvent::Authenticate {
             token: self.config.token.clone(),
         })
         .await
-        .map_err(|_| SeriaError::Other("Failed to send authentication event".into()))
+        .map_err(|_| SeriaError::Other("Failed to send authentication event".into()))?;
+
+        spawn(async move {
+            select! {
+                _ = heartbeat_task => {},
+                _ = connection_task => {},
+            }
+        });
+
+        Ok(())
     }
 
     pub async fn send(&self, event: ClientEvent) -> Result<(), SeriaError> {

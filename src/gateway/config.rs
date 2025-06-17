@@ -1,7 +1,13 @@
+use std::time::Duration;
+
 use crate::error::SeriaError;
 
 #[derive(Clone, Debug)]
 pub struct GatewayConfig {
+    pub heartbeat_interval: Duration,
+    pub max_reconnect_attempts: usize,
+    pub reconnect_attempts: usize,
+    pub reconnect_delay: Duration,
     pub token: String,
     pub ws_url: String,
 }
@@ -21,6 +27,10 @@ impl GatewayConfig {
         };
 
         Ok(GatewayConfig {
+            heartbeat_interval: Duration::from_secs(30),
+            max_reconnect_attempts: 5,
+            reconnect_attempts: 0,
+            reconnect_delay: Duration::from_secs(5),
             token,
             ws_url: ws_url.into(),
         })
