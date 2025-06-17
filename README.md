@@ -18,11 +18,12 @@ tokio = { version = "*", features = ["macros", "rt-multi-thread"] }
 ## Ping Pong Example
 
 ```rs
+use futures::StreamExt;
 use seria::{
     client::SeriaClientBuilder,
     error::SeriaError,
     http::HttpClient,
-    models::{GatewayEvent, MessageCreate},
+    models::{GatewayEvent, MessageSend},
 };
 use std::{env, sync::Arc};
 use tracing::error;
@@ -33,12 +34,12 @@ async fn handle_event(event: GatewayEvent, http: Arc<HttpClient>) {
             let content = message.content.to_string();
 
             if content == "!ping" {
-                let payload = MessageCreate {
+                let payload = MessageSend {
                     content: "Pong!".to_string(),
                     ..Default::default()
                 };
 
-                if let Err(e) = http.create_message(&message.channel, payload).await {
+                if let Err(e) = http.send_message(&message.channel, payload).await {
                     error!("Failed to send message: {}", e);
                 }
             }

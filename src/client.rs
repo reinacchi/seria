@@ -1,5 +1,8 @@
-/// src/client.rs
-use crate::{error::SeriaError, gateway::{GatewayClient, GatewayConfig}, http::{HttpClient, HttpConfig}};
+use crate::{
+    error::SeriaError,
+    gateway::{GatewayClient, GatewayConfig},
+    http::{HttpClient, HttpConfig},
+};
 
 pub struct SeriaClient {
     pub http: HttpClient,
@@ -31,9 +34,9 @@ impl SeriaClientBuilder {
     }
 
     pub fn build(self) -> Result<SeriaClient, SeriaError> {
-        let token = self.token.ok_or_else(|| {
-            SeriaError::Other("Token must be provided".into())
-        })?;
+        let token = self
+            .token
+            .ok_or_else(|| SeriaError::Other("Token must be provided".into()))?;
 
         let http_config = HttpConfig::new(&token)?;
         let gateway_config = GatewayConfig::new(&token)?;

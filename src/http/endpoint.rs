@@ -3,10 +3,10 @@ use std::fmt;
 /// Base URL for the Revolt API
 const BASE_URL: &str = "https://api.revolt.chat";
 
-/// Enum representing API endpoints (simplified to just ChannelMessageSend for now)
 #[derive(Debug, Clone)]
 pub enum Endpoint {
     ChannelMessageSend(String),
+    ChannelMessageEdit(String, String),
 }
 
 impl Endpoint {
@@ -14,6 +14,7 @@ impl Endpoint {
     pub fn method(&self) -> &'static str {
         match self {
             Endpoint::ChannelMessageSend(_) => "POST",
+            Endpoint::ChannelMessageEdit(_, _) => "PATCH",
         }
     }
 
@@ -22,6 +23,9 @@ impl Endpoint {
         match self {
             Endpoint::ChannelMessageSend(channel_id) => {
                 format!("/channels/{}/messages", channel_id)
+            }
+            Endpoint::ChannelMessageEdit(channel_id, message_id) => {
+                format!("/channels/{}/messages/{}", channel_id, message_id)
             }
         }
     }

@@ -1,11 +1,11 @@
 use bitflags::bitflags;
 use serde::{Deserialize, Serialize};
 
-use crate::models::{
+use crate::{http::HttpClient, models::{
     attachment::Attachment,
     embed::{Embed, EmbedCreate},
     Id,
-};
+}, SeriaResult};
 
 /// Represents a message in the Revolt platform.
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -27,9 +27,31 @@ pub struct Message {
     pub replies: Vec<Id>,
 }
 
+impl Message {
+
+    /// Edit this message.
+    pub async fn edit(
+        &self,
+        http: &HttpClient,
+        payload: impl Into<MessageEdit>,
+    ) -> SeriaResult<Self> {
+        http.edit_message(&self.channel, &self.id, payload).await
+    }
+
+    /// Reply to the message corresponding to this instance.
+    pub async fn reply(
+        &self,
+        http: &HttpClient,
+        payload: impl Into<MessageSend>,
+        mention: bool,
+    ) -> SeriaResult<Self> {
+        http.reply_message(&self.channel, &self.id, payload, mention).await
+    }
+}
+
 /// Represents a request to create a new message.
 #[derive(Clone, Debug, Default, Serialize)]
-pub struct MessageCreate {
+pub struct MessageSend {
     pub content: String,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub attachments: Vec<Id>,
@@ -76,7 +98,7 @@ pub struct MessageInteractions {
     pub restrict_reactions: bool,
 }
 
-impl<T: Into<String>> From<T> for MessageCreate {
+impl<T: Into<String>> From<T> for MessageSend {
     fn from(content: T) -> Self {
         Self {
             content: content.into(),

@@ -37,15 +37,18 @@ pub enum SeriaError {
 pub enum AuthError {
     /// Generic fallback error.
     #[error("Uncategorized authentication error")]
-    Uncategorized,
+    LabelMe,
 
     /// Internal issue on the server side.
     #[error("Server encountered an internal error")]
-    ServerError,
+    InternalError,
 
     /// Provided token is invalid or expired.
     #[error("Invalid session token")]
-    InvalidToken,
+    InvalidSession,
+
+    #[error("Invalid username")]
+    OnboardingNotFinished,
 
     /// Attempted to authenticate while already authenticated.
     #[error("Session already active")]
