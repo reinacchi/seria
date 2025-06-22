@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     error::AuthError,
-    models::{message::Message, server::Server, Id},
+    models::{Message, Server, Id},
 };
 
 #[derive(Debug, Serialize, Clone, PartialEq)]
