@@ -27,7 +27,7 @@ impl GatewayConfig {
         };
 
         Ok(GatewayConfig {
-            heartbeat_interval: Duration::from_secs(30),
+            heartbeat_interval: Duration::from_secs(15),
             max_reconnect_attempts: 5,
             reconnect_attempts: 0,
             reconnect_delay: Duration::from_secs(5),

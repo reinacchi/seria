@@ -18,6 +18,7 @@ pub struct GatewayClient {
     client_receiver: Receiver<ClientEvent>,
     server_sender: Sender<Result<GatewayEvent, SeriaError>>,
     server_receiver: Receiver<Result<GatewayEvent, SeriaError>>,
+    is_connected: bool,
 }
 
 impl GatewayClient {
@@ -32,10 +33,17 @@ impl GatewayClient {
             client_sender,
             server_receiver,
             server_sender,
+            is_connected: false,
         }
     }
 
     pub async fn connect(&mut self) -> Result<(), SeriaError> {
+        if self.is_connected {
+            return Ok(());
+        }
+
+        self.is_connected = true;
+
         loop {
             match self.try_connect().await {
                 Ok(_) => {
