@@ -1,6 +1,6 @@
 # Seria
 
-![seria logo](logo)
+![seria logo](logo.png)
 
 - **⚠️ This library is heavily Work in Progress!! Please do not use.**
 
