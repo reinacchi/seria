@@ -2,9 +2,9 @@
 
 ![seria logo](logo.png)
 
-- **⚠️ This library is heavily Work in Progress!! Please do not use.**
+- **⚠️ This library is heavily Work in Progress!! Please do not use yet.**
 
-**Seria** is a lightweight Revolt client library built for the Rust ecosystem.
+**Seria** is a Rust-based library for interacting with Revolt.
 
 ## Installation
 
@@ -32,6 +32,11 @@ use tracing::error;
 
 async fn handle_event(event: GatewayEvent, http: Arc<HttpClient>) {
     match event {
+        GatewayEvent::Ready => {
+            if let Ok(user) = http.get_self().await {
+                println!("{}#{} is Ready!", user.username, user.discriminator);
+            }
+        }
         GatewayEvent::Message(message) => {
             let content = message.content.to_string();
 
@@ -74,7 +79,7 @@ async fn main() -> Result<(), SeriaError> {
 
 ## Useful Links
 
-- [The official Seria Revolt server]() - A place where you can receive support and updates.
+- [The official Seria Revolt server](rvlt.gg/g65YG8CA) - A place where you can receive support and updates.
 
 ## License
 
