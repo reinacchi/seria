@@ -79,7 +79,7 @@ async fn main() -> Result<(), SeriaError> {
 
 ## Useful Links
 
-- [The official Seria Revolt server](rvlt.gg/g65YG8CA) - A place where you can receive support and updates.
+- [The official Seria Revolt server](https://rvlt.gg/g65YG8CA) - A place where you can receive support and updates.
 
 ## License
 
