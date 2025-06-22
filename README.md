@@ -23,7 +23,7 @@ tokio = { version = "*", features = ["macros", "rt-multi-thread"] }
 use futures::StreamExt;
 use seria::{
     client::SeriaClientBuilder,
-    error::SeriaError,
+    error::SeriaResult,
     http::HttpClient,
     models::{GatewayEvent, MessageSend},
 };
@@ -56,7 +56,7 @@ async fn handle_event(event: GatewayEvent, http: Arc<HttpClient>) {
 }
 
 #[tokio::main]
-async fn main() -> Result<(), SeriaError> {
+async fn main() -> SeriaResult<()> {
     let token = env::var("REVOLT_TOKEN")?;
 
     let mut client = SeriaClientBuilder::new().token(&token).build()?;
