@@ -9,7 +9,9 @@ use {
 use crate::{
     error::{SeriaError, SeriaResult},
     http::{endpoint::Endpoint, HttpConfig},
-    models::{Message, MessageSend, MessageEdit, MessageReplyIntent},
+    models::{
+        FlagResponse, Message, MessageEdit, MessageReplyIntent, MessageSend, User, UserUpdate,
+    },
 };
 
 #[derive(Debug, Clone)]
@@ -115,7 +117,35 @@ impl HttpClient {
         Ok(())
     }
 
-    /// Sends a message in the specified channel.
+    // User-related methods
+    /// Get properties of the bot user.
+    pub async fn get_self(&self) -> SeriaResult<User> {
+        self.get(Endpoint::User("@me".to_string()).path()).await
+    }
+
+    /// Edit a user.
+    pub async fn edit_user(
+        &self,
+        user_id: &str,
+        payload: impl Into<UserUpdate>,
+    ) -> SeriaResult<User> {
+        self.patch(Endpoint::User(user_id.to_string()).path(), payload.into())
+            .await
+    }
+
+    /// Get properties of the targeted user.
+    pub async fn get_user(&self, user_id: &str) -> SeriaResult<User> {
+        self.get(Endpoint::User(user_id.to_string()).path()).await
+    }
+
+    /// Get the flags of the targeted user.
+    pub async fn get_user_flags(&self, user_id: &str) -> SeriaResult<FlagResponse> {
+        self.get(Endpoint::UserFlags(user_id.to_string()).path())
+            .await
+    }
+
+    // Message-related methods
+    /// Send a message in the specified channel.
     pub async fn send_message(
         &self,
         channel_id: &str,
@@ -128,7 +158,7 @@ impl HttpClient {
         .await
     }
 
-    /// Edits a message in the specified channel.
+    /// Edit a message in the specified channel.
     pub async fn edit_message(
         &self,
         channel_id: &str,
@@ -142,7 +172,7 @@ impl HttpClient {
         .await
     }
 
-    /// Replies to a certain message in the specified channel.
+    /// Reply to a certain message in the specified channel.
     pub async fn reply_message(
         &self,
         channel_id: &str,

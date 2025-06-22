@@ -7,12 +7,16 @@ const BASE_URL: &str = "https://api.revolt.chat";
 pub enum Endpoint {
     ChannelMessageSend(String),
     ChannelMessageEdit(String, String),
+    User(String),
+    UserFlags(String),
 }
 
 impl Endpoint {
     /// Returns the HTTP method typically used for this endpoint
     pub fn method(&self) -> &'static str {
         match self {
+            Endpoint::User(_)
+            | Endpoint::UserFlags(_) => "GET",
             Endpoint::ChannelMessageSend(_) => "POST",
             Endpoint::ChannelMessageEdit(_, _) => "PATCH",
         }
@@ -26,6 +30,12 @@ impl Endpoint {
             }
             Endpoint::ChannelMessageEdit(channel_id, message_id) => {
                 format!("/channels/{}/messages/{}", channel_id, message_id)
+            }
+            Endpoint::User(user_id) => {
+                format!("/users/{}", user_id)
+            }
+            Endpoint::UserFlags(user_id) => {
+                format!("/users/{}/flags", user_id)
             }
         }
     }
