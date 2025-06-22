@@ -83,4 +83,4 @@ async fn main() -> Result<(), SeriaError> {
 
 ## License
 
-Please refer to the [LICENSE](https://github.com/reinacchi/seria/blob/dev/LICENSE) file.
+Please refer to the [LICENSE](https://github.com/reinacchi/seria/blob/master/LICENSE) file.
