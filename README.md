@@ -1,5 +1,7 @@
 # Seria
 
+![seria logo](logo)
+
 - **⚠️ This library is heavily Work in Progress!! Please do not use.**
 
 **Seria** is a lightweight Revolt client library built for the Rust ecosystem.
