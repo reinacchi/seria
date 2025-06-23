@@ -5,7 +5,7 @@ use tokio::{select, spawn, time::sleep};
 use tokio_tungstenite::{connect_async, tungstenite::Message};
 
 use crate::{
-    error::SeriaError,
+    error::{SeriaError, SeriaResult},
     gateway::GatewayConfig,
     models::{ClientEvent, GatewayEvent},
 };
@@ -37,7 +37,7 @@ impl GatewayClient {
         }
     }
 
-    pub async fn connect(&mut self) -> Result<(), SeriaError> {
+    pub async fn connect(&mut self) -> SeriaResult<()> {
         if self.is_connected {
             return Ok(());
         }
@@ -63,100 +63,118 @@ impl GatewayClient {
         }
     }
 
-    async fn try_connect(&mut self) -> Result<(), SeriaError> {
-        let (mut stream, _) = connect_async(&self.config.ws_url).await?;
+    async fn try_connect(&mut self) -> SeriaResult<()> {
+        let (stream, _) = match connect_async(&self.config.ws_url).await {
+            Ok((stream, response)) => (stream, response),
+            Err(e) => {
+                return Err(e.into());
+            }
+        };
+
         let client_receiver = self.client_receiver.clone();
         let server_sender = self.server_sender.clone();
         let heartbeat_sender = self.client_sender.clone();
-
-        let heartbeat_task = spawn(Self::heartbeat(
-            heartbeat_sender,
-            self.config.heartbeat_interval,
-        ));
-
-        let connection_task = spawn(async move {
-            pin_mut!(client_receiver);
-
-            loop {
-                select! {
-                    Some(event) = client_receiver.next() => {
-                        let msg = match serde_json::to_string(&event) {
-                            Ok(json) => Message::Text(json.into()),
-                            Err(e) => {
-                                let _ = server_sender.send(Err(SeriaError::Other(format!("Serialization error: {}", e)))).await;
-                                continue;
-                            }
-                        };
-                        if let Err(e) = stream.send(msg).await {
-                            let _ = server_sender.send(Err(e.into())).await;
-                            break;
-                        }
-                    },
-                    Some(msg) = stream.next() => {
-                        let event = match msg {
-                            Ok(msg) => match msg.to_text() {
-                                Ok(text) => {
-                                    let value: serde_json::Value = match serde_json::from_str(text) {
-                                        Ok(v) => v,
-                                        Err(e) => {
-                                            let _ = server_sender.send(Err(SeriaError::Other(format!("Deserialization error: {}", e)))).await;
-                                            continue;
-                                        }
-                                    };
-
-                                    // Handle heartbeat acknowledgment
-                                    if let Ok(GatewayEvent::Pong) = serde_json::from_value(value.clone()) {
-                                        continue;
-                                    }
-
-                                    match serde_json::from_value(value.clone()) {
-                                        Ok(event) => Ok(event),
-                                        Err(_) => continue,
-                                    }
-                                },
-                                Err(e) => Err(e.into()),
-                            },
-                            Err(e) => Err(e.into()),
-                        };
-
-                        if let Ok(_inner_event) = &event {
-                            if server_sender.send(event).await.is_err() {
-                                break;
-                            }
-                        }
-                    },
-                    else => break,
-                }
-            }
-
-            let _ = server_sender
-                .send(Err(SeriaError::Other(
-                    "WebSocket disconnected.".to_string(),
-                )))
-                .await;
-        });
 
         self.send(ClientEvent::Authenticate {
             token: self.config.token.clone(),
         })
         .await
-        .map_err(|_| SeriaError::Other("Failed to send authentication event".into()))?;
+        .map_err(|_e| SeriaError::Other("Failed to send authentication event".into()))?;
+
+        let heartbeat_task = spawn({
+            let interval = self.config.heartbeat_interval;
+            async move {
+                let _ = Self::heartbeat(heartbeat_sender, interval).await;
+            }
+        });
+
+        let (mut write_stream, mut read_stream) = stream.split();
+
+        let write_task = spawn({
+            let server_sender = server_sender.clone();
+            async move {
+                pin_mut!(client_receiver);
+
+                while let Some(event) = client_receiver.next().await {
+                    let msg = match serde_json::to_string(&event) {
+                        Ok(json) => Message::Text(json.into()),
+                        Err(e) => {
+                            let _ = server_sender
+                                .send(Err(SeriaError::Other(format!(
+                                    "Serialization error: {}",
+                                    e
+                                ))))
+                                .await;
+                            continue;
+                        }
+                    };
+
+                    if let Err(e) = write_stream.send(msg).await {
+                        let _ = server_sender.send(Err(e.into())).await;
+                        break;
+                    }
+                }
+            }
+        });
+
+        let read_task = spawn({
+            let server_sender = server_sender.clone();
+            async move {
+                while let Some(msg) = read_stream.next().await {
+                    let event = match msg {
+                        Ok(msg) => match msg {
+                            Message::Text(text) => {
+                                match serde_json::from_str::<GatewayEvent>(&text) {
+                                    Ok(GatewayEvent::Pong) => continue,
+                                    Ok(event) => Ok(event),
+                                    Err(e) => Err(SeriaError::Other(format!(
+                                        "Deserialization error: {}",
+                                        e
+                                    ))),
+                                }
+                            }
+                            Message::Close(_) => {
+                                break;
+                            }
+                            _ => continue,
+                        },
+                        Err(e) => Err(e.into()),
+                    };
+
+                    if server_sender.send(event).await.is_err() {
+                        break;
+                    }
+                }
+
+                let _ = server_sender
+                    .send(Err(SeriaError::Other("WebSocket disconnected".to_string())))
+                    .await;
+            }
+        });
 
         spawn(async move {
             select! {
                 _ = heartbeat_task => {},
-                _ = connection_task => {},
+                _ = write_task => {},
+                _ = read_task => {},
             }
+
+            // Attempt to reconnect when any task ends
+            let _ = server_sender
+                .send(Err(SeriaError::Other(
+                    "WebSocket connection lost, attempting to reconnect".to_string(),
+                )))
+                .await;
         });
 
         Ok(())
     }
 
-    pub async fn send(&self, event: ClientEvent) -> Result<(), SeriaError> {
+    pub async fn send(&self, event: ClientEvent) -> SeriaResult<()> {
         self.client_sender
             .send(event)
             .await
-            .map_err(|_| SeriaError::Other("Failed to send event to client".into()))
+            .map_err(|e| SeriaError::Other(format!("Failed to send event to client: {}", e)))
     }
 
     pub fn latency(&self) -> Duration {
@@ -170,14 +188,17 @@ impl GatewayClient {
 
     async fn heartbeat(sender: Sender<ClientEvent>, interval: Duration) -> Result<(), SeriaError> {
         loop {
-            let _ = sender.send(ClientEvent::Ping { data: 0 }).await;
+            if let Err(_e) = sender.send(ClientEvent::Ping { data: 0 }).await {
+                break;
+            }
             sleep(interval).await;
         }
+        Ok(())
     }
 }
 
 impl Stream for GatewayClient {
-    type Item = Result<GatewayEvent, SeriaError>;
+    type Item = SeriaResult<GatewayEvent>;
 
     fn poll_next(
         self: std::pin::Pin<&mut Self>,
