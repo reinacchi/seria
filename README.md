@@ -23,9 +23,9 @@ tokio = { version = "*", features = ["macros", "rt-multi-thread"] }
 use futures::StreamExt;
 use seria::{
     client::SeriaClientBuilder,
-    error::SeriaResult,
     http::HttpClient,
     models::{GatewayEvent, MessageSend},
+    SeriaResult,
 };
 use std::{env, sync::Arc};
 use tracing::error;
@@ -80,6 +80,7 @@ async fn main() -> SeriaResult<()> {
 ## Useful Links
 
 - [The official Seria Revolt server](https://rvlt.gg/g65YG8CA) - A place where you can receive support and updates.
+- [The website](https://seria.2rkf.me) - The official website and documentation for Seria.
 
 ## License
 
