@@ -56,7 +56,7 @@ impl GatewayClient {
                         let _ = client
                             .server_sender
                             .send(Err(SeriaError::Other(format!(
-                                "Connection failed: {}, retrying in {}s",
+                                "Connection failed. {}, retrying in {}s",
                                 e,
                                 client.config.reconnect_delay.as_secs()
                                     * client.config.reconnect_attempts as u64

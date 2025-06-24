@@ -5,6 +5,7 @@ use crate::{
 };
 
 /// Represents the main Seria client.
+#[derive(Clone, Debug)]
 pub struct SeriaClient {
     /// The HTTP client.
     pub http: HttpClient,
@@ -25,6 +26,7 @@ impl SeriaClient {
 }
 
 /// Represents a builder pattern for constructing a SeriaClient.
+#[derive(Clone, Debug)]
 pub struct SeriaClientBuilder {
     token: Option<String>,
 }

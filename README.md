@@ -21,8 +21,7 @@ tokio = { version = "*", features = ["macros", "rt-multi-thread"] }
 
 ```rs
 use seria::{
-    client::SeriaClientBuilder,
-    http::HttpClient,
+    client::{SeriaClient, SeriaClientBuilder},
     models::{GatewayEvent, MessageSend},
     SeriaResult,
     StreamExt,
@@ -30,10 +29,10 @@ use seria::{
 use std::{pin::pin, sync::Arc};
 use tracing::{error, warn};
 
-async fn handle_event(event: GatewayEvent, http: Arc<HttpClient>) {
+async fn handle_event(event: GatewayEvent, client: Arc<SeriaClient>) {
     match event {
         GatewayEvent::Ready => {
-            if let Ok(user) = http.get_self().await {
+            if let Ok(user) = client.http.get_self().await {
                 println!("{}#{} is Ready!", user.username, user.discriminator);
             }
         }
@@ -46,7 +45,7 @@ async fn handle_event(event: GatewayEvent, http: Arc<HttpClient>) {
                     ..Default::default()
                 };
 
-                if let Err(e) = http.send_message(&message.channel, payload).await {
+                if let Err(e) = client.http.send_message(&message.channel, payload).await {
                     error!("Failed to send message: {}", e);
                 }
             }
@@ -59,23 +58,30 @@ async fn handle_event(event: GatewayEvent, http: Arc<HttpClient>) {
 async fn main() -> SeriaResult<()> {
     tracing_subscriber::fmt::init();
 
-    let token = "REVOLT_TOKEN".to_string();
+    let token = "REVOLT_TOKEN";
 
-    let mut client = SeriaClientBuilder::new().token(&token).build()?;
-
-    let http = Arc::new(client.http.clone());
+    let mut client = SeriaClientBuilder::new().
+        token(token)
+        .build()?;
 
     client.connect().await?;
 
-    let mut event_stream = pin!(client.gateway);
+    let client = Arc::new(client);
+
+    let mut event_stream = pin!(client.gateway.clone());
 
     while let Some(item) = event_stream.next().await {
-        let Ok(event) = item else {
-            warn!(error = ?item.unwrap_err(), "Failed to receive event");
-            continue;
-        };
-
-        tokio::spawn(handle_event(event, Arc::clone(&http)));
+        match item {
+            Ok(event) => {
+                let client = Arc::clone(&client);
+                tokio::spawn(async move {
+                    handle_event(event, client).await;
+                });
+            }
+            Err(e) => {
+                warn!(error = ?e, "Failed to receive event");
+            }
+        }
     }
 
     Ok(())

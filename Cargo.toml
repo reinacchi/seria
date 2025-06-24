@@ -1,8 +1,8 @@
 [package]
 name = "seria"
-description = "A lightweight Revolt client library built for the Rust ecosystem."
-version = "0.0.2-dev.2"
-authors = ["Reina <notmarx.tech@gmail.com>"]
+description = "A Rust-based library for interacting with Revolt."
+version = "0.0.2-dev.3"
+authors = ["Reina"]
 repository = "https://github.com/reinacchi/seria"
 license = "MIT"
 edition = "2021"
@@ -24,6 +24,3 @@ thiserror = "2.0.12"
 tokio = { version = "1.45.1", features = ["macros", "rt-multi-thread", "sync", "time"] }
 tokio-tungstenite = { version = "0.26.2", features = ["rustls-tls-webpki-roots"] }
 tracing = "0.1.41"
-
-[dev-dependencies]
-tokio = { version = "1.45.1", features = ["macros"] }
