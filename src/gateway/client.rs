@@ -2,7 +2,10 @@ use async_channel::{self, Receiver, Sender};
 use futures::{pin_mut, SinkExt, Stream, StreamExt};
 use std::time::{Duration, Instant};
 use tokio::{select, spawn, time::sleep};
-use tokio_tungstenite::{connect_async, tungstenite::Message};
+use tokio_tungstenite::{
+    connect_async,
+    tungstenite::{Error as WsError, Message},
+};
 
 use crate::{
     error::{SeriaError, SeriaResult},
@@ -13,12 +16,12 @@ use crate::{
 #[derive(Debug, Clone)]
 pub struct GatewayClient {
     config: GatewayConfig,
-    last_heartbeat: (Instant, Instant),
+    pub last_heartbeat: (Instant, Instant),
     client_sender: Sender<ClientEvent>,
     client_receiver: Receiver<ClientEvent>,
     server_sender: Sender<Result<GatewayEvent, SeriaError>>,
     server_receiver: Receiver<Result<GatewayEvent, SeriaError>>,
-    is_connected: bool,
+    pub is_connected: bool,
 }
 
 impl GatewayClient {
@@ -42,44 +45,60 @@ impl GatewayClient {
             return Ok(());
         }
 
-        self.is_connected = true;
-
-        loop {
-            match self.try_connect().await {
-                Ok(_) => {
-                    self.config.reconnect_attempts = 0; // Reset attempts on successful connection
-                    return Ok(());
-                }
-                Err(e) => {
-                    if self.config.reconnect_attempts >= self.config.max_reconnect_attempts {
-                        return Err(e);
+        let mut client = self.clone();
+        spawn(async move {
+            loop {
+                match client.try_connect().await {
+                    Ok(_) => {
+                        client.config.reconnect_attempts = 0;
                     }
+                    Err(e) => {
+                        let _ = client
+                            .server_sender
+                            .send(Err(SeriaError::Other(format!(
+                                "Connection failed: {}, retrying in {}s",
+                                e,
+                                client.config.reconnect_delay.as_secs()
+                                    * client.config.reconnect_attempts as u64
+                            ))))
+                            .await;
+                        client.is_connected = false;
+                        client.config.reconnect_attempts += 1;
 
-                    self.config.reconnect_attempts += 1;
-                    let delay = self.config.reconnect_delay * self.config.reconnect_attempts as u32;
-                    sleep(delay).await;
+                        let delay = std::cmp::min(
+                            client.config.reconnect_delay * client.config.reconnect_attempts as u32,
+                            Duration::from_secs(60),
+                        );
+                        sleep(delay).await;
+                    }
                 }
             }
-        }
+        });
+
+        self.is_connected = true;
+        Ok(())
     }
 
     async fn try_connect(&mut self) -> SeriaResult<()> {
         let (stream, _) = match connect_async(&self.config.ws_url).await {
             Ok((stream, response)) => (stream, response),
             Err(e) => {
-                return Err(e.into());
+                return Err(handle_websocket_error(e));
             }
         };
 
-        let client_receiver = self.client_receiver.clone();
-        let server_sender = self.server_sender.clone();
-        let heartbeat_sender = self.client_sender.clone();
+        self.is_connected = true;
+        self.config.reconnect_attempts = 0;
 
         self.send(ClientEvent::Authenticate {
             token: self.config.token.clone(),
         })
         .await
         .map_err(|_e| SeriaError::Other("Failed to send authentication event".into()))?;
+
+        let client_receiver = self.client_receiver.clone();
+        let server_sender = self.server_sender.clone();
+        let heartbeat_sender = self.client_sender.clone();
 
         let heartbeat_task = spawn({
             let interval = self.config.heartbeat_interval;
@@ -110,7 +129,9 @@ impl GatewayClient {
                     };
 
                     if let Err(e) = write_stream.send(msg).await {
-                        let _ = server_sender.send(Err(e.into())).await;
+                        let _ = server_sender
+                            .send(Err(handle_websocket_error(e).into()))
+                            .await;
                         break;
                     }
                 }
@@ -138,7 +159,7 @@ impl GatewayClient {
                             }
                             _ => continue,
                         },
-                        Err(e) => Err(e.into()),
+                        Err(e) => Err(handle_websocket_error(e).into()),
                     };
 
                     if server_sender.send(event).await.is_err() {
@@ -152,22 +173,11 @@ impl GatewayClient {
             }
         });
 
-        spawn(async move {
-            select! {
-                _ = heartbeat_task => {},
-                _ = write_task => {},
-                _ = read_task => {},
-            }
-
-            // Attempt to reconnect when any task ends
-            let _ = server_sender
-                .send(Err(SeriaError::Other(
-                    "WebSocket connection lost, attempting to reconnect".to_string(),
-                )))
-                .await;
-        });
-
-        Ok(())
+        select! {
+            _ = heartbeat_task => Err(SeriaError::Other("Heartbeat task terminated".into())),
+            _ = write_task => Err(SeriaError::Other("Write task terminated".into())),
+            _ = read_task => Err(SeriaError::Other("Read task terminated".into())),
+        }
     }
 
     pub async fn send(&self, event: ClientEvent) -> SeriaResult<()> {
@@ -182,7 +192,7 @@ impl GatewayClient {
         if last_ping > last_pong {
             last_ping - last_pong
         } else {
-            last_pong - last_ping
+            last_pong - last_pong
         }
     }
 
@@ -194,6 +204,19 @@ impl GatewayClient {
             sleep(interval).await;
         }
         Ok(())
+    }
+}
+
+fn handle_websocket_error(err: WsError) -> SeriaError {
+    match &err {
+        WsError::AlreadyClosed => SeriaError::Other("WebSocket already closed".to_string()),
+        WsError::Io(io_err) if io_err.raw_os_error() == Some(104) => {
+            SeriaError::Other("Connection reset by peer".to_string())
+        }
+        WsError::Io(io_err) if io_err.raw_os_error() == Some(10054) => {
+            SeriaError::Other("Connection forcibly closed by remote host".to_string())
+        }
+        _ => SeriaError::WebSocket(err),
     }
 }
 

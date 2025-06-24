@@ -67,8 +67,11 @@ async fn main() -> SeriaResult<()> {
 
     let mut event_stream = pin!(client.gateway);
 
-    while let Some(event) = event_stream.next().await {
-        let event = event?;
+    while let Some(item) = event_stream.next().await {
+        let Ok(event) = item else {
+            warn!(error = ?item.unwrap_err(), "Failed to receive event");
+            continue;
+        };
 
         tokio::spawn(handle_event(event, Arc::clone(&http)));
     }
