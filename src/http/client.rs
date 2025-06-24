@@ -10,7 +10,8 @@ use crate::{
     error::{SeriaError, SeriaResult},
     http::{endpoint::Endpoint, HttpConfig},
     models::{
-        FlagResponse, Message, MessageEdit, MessageReplyIntent, MessageSend, User, UserUpdate,
+        FlagResponse, Message, MessageEdit, MessageReplyIntent, MessageSend, PublicBot, User,
+        UserUpdate,
     },
 };
 
@@ -115,6 +116,13 @@ impl HttpClient {
         }
 
         Ok(())
+    }
+
+    // Bot-related methods
+    /// Get a public bot.
+    pub async fn get_public_bot(&self, bot_id: &str) -> SeriaResult<PublicBot> {
+        self.get(Endpoint::BotInvite(bot_id.to_string()).path())
+            .await
     }
 
     // User-related methods

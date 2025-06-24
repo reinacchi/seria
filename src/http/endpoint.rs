@@ -1,30 +1,22 @@
-use std::fmt;
-
-/// Base URL for the Revolt API
-const BASE_URL: &str = "https://api.revolt.chat";
-
 #[derive(Debug, Clone)]
 pub enum Endpoint {
+    BotInvite(String),
     ChannelMessageSend(String),
     ChannelMessageEdit(String, String),
     User(String),
     UserFlags(String),
+    UserUsername(String),
+    UserDefaultAvatar(String),
+    UserProfile(String),
 }
 
 impl Endpoint {
-    /// Returns the HTTP method typically used for this endpoint
-    pub fn method(&self) -> &'static str {
-        match self {
-            Endpoint::User(_)
-            | Endpoint::UserFlags(_) => "GET",
-            Endpoint::ChannelMessageSend(_) => "POST",
-            Endpoint::ChannelMessageEdit(_, _) => "PATCH",
-        }
-    }
-
     /// Returns the path component of the endpoint URL
     pub fn path(&self) -> String {
         match self {
+            Endpoint::BotInvite(bot_id) => {
+                format!("/bots/{}/invite", bot_id)
+            }
             Endpoint::ChannelMessageSend(channel_id) => {
                 format!("/channels/{}/messages", channel_id)
             }
@@ -37,17 +29,15 @@ impl Endpoint {
             Endpoint::UserFlags(user_id) => {
                 format!("/users/{}/flags", user_id)
             }
+            Endpoint::UserUsername(user_id) => {
+                format!("/users/{}/username", user_id)
+            }
+            Endpoint::UserDefaultAvatar(user_id) => {
+                format!("/users/{}/default_avatar", user_id)
+            }
+            Endpoint::UserProfile(user_id) => {
+                format!("/users/{}/profile", user_id)
+            }
         }
-    }
-
-    /// Returns the full URL for the endpoint
-    pub fn url(&self) -> String {
-        format!("{}{}", BASE_URL, self.path())
-    }
-}
-
-impl fmt::Display for Endpoint {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{} {}", self.method(), self.url())
     }
 }

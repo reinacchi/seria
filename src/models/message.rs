@@ -1,11 +1,15 @@
 use bitflags::bitflags;
 use serde::{Deserialize, Serialize};
 
-use crate::{http::HttpClient, models::{
-    attachment::Attachment,
-    embed::{Embed, EmbedCreate},
-    Id,
-}, SeriaResult};
+use crate::{
+    http::HttpClient,
+    models::{
+        attachment::Attachment,
+        embed::{Embed, EmbedCreate},
+        Id,
+    },
+    SeriaResult,
+};
 
 /// Represents a message in the Revolt platform.
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -28,7 +32,6 @@ pub struct Message {
 }
 
 impl Message {
-
     /// Edit this message.
     pub async fn edit(
         &self,
@@ -45,7 +48,8 @@ impl Message {
         payload: impl Into<MessageSend>,
         mention: bool,
     ) -> SeriaResult<Self> {
-        http.reply_message(&self.channel, &self.id, payload, mention).await
+        http.reply_message(&self.channel, &self.id, payload, mention)
+            .await
     }
 }
 

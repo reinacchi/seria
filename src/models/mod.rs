@@ -1,5 +1,6 @@
 pub use {
     attachment::*,
+    bot::*,
     channel::*,
     embed::*,
     event::*,
@@ -11,6 +12,7 @@ pub use {
 };
 
 mod attachment;
+mod bot;
 mod channel;
 mod embed;
 mod event;
