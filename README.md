@@ -57,6 +57,8 @@ async fn handle_event(event: GatewayEvent, http: Arc<HttpClient>) {
 
 #[tokio::main]
 async fn main() -> SeriaResult<()> {
+    tracing_subscriber::fmt::init();
+
     let token = "REVOLT_TOKEN".to_string();
 
     let mut client = SeriaClientBuilder::new().token(&token).build()?;
