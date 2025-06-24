@@ -20,14 +20,14 @@ tokio = { version = "*", features = ["macros", "rt-multi-thread"] }
 ## Ping Pong Example
 
 ```rs
-use futures::StreamExt;
 use seria::{
     client::SeriaClientBuilder,
     http::HttpClient,
     models::{GatewayEvent, MessageSend},
     SeriaResult,
+    StreamExt,
 };
-use std::{env, sync::Arc};
+use std::{pin::pin, sync::Arc};
 use tracing::{error, warn};
 
 async fn handle_event(event: GatewayEvent, http: Arc<HttpClient>) {
@@ -57,7 +57,7 @@ async fn handle_event(event: GatewayEvent, http: Arc<HttpClient>) {
 
 #[tokio::main]
 async fn main() -> SeriaResult<()> {
-    let token = env::var("REVOLT_TOKEN")?;
+    let token = "REVOLT_TOKEN".to_string();
 
     let mut client = SeriaClientBuilder::new().token(&token).build()?;
 

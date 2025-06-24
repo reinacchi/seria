@@ -1,5 +1,6 @@
 #[doc(hidden)]
 pub use error::SeriaResult;
+pub use futures::StreamExt;
 pub mod error;
 pub mod client;
 pub mod gateway;
