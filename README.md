@@ -28,7 +28,7 @@ use seria::{
     SeriaResult,
 };
 use std::{env, sync::Arc};
-use tracing::error;
+use tracing::{error, warn};
 
 async fn handle_event(event: GatewayEvent, http: Arc<HttpClient>) {
     match event {
