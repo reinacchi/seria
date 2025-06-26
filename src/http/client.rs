@@ -160,7 +160,7 @@ impl HttpClient {
         payload: impl Into<MessageSend>,
     ) -> SeriaResult<Message> {
         self.post(
-            Endpoint::ChannelMessageSend(channel_id.to_string()).path(),
+            Endpoint::ChannelMessages(channel_id.to_string()).path(),
             payload.into(),
         )
         .await
@@ -174,7 +174,7 @@ impl HttpClient {
         payload: impl Into<MessageEdit>,
     ) -> SeriaResult<Message> {
         self.patch(
-            Endpoint::ChannelMessageEdit(channel_id.to_string(), message_id.to_string()).path(),
+            Endpoint::ChannelMessage(channel_id.to_string(), message_id.to_string()).path(),
             payload.into(),
         )
         .await
